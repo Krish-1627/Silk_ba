@@ -24,8 +24,12 @@ function extractApiKey(rawValue) {
     const valuePart = firstLine.includes('=') ? firstLine.split('=').slice(1).join('=').trim() : firstLine;
     const unquoted = valuePart.replace(/^['\"]|['\"]$/g, '').trim();
 
-    const keyMatch = unquoted.match(/AIza[0-9A-Za-z_-]{20,}/);
-    return keyMatch ? keyMatch[0] : '';
+    // Support both classic Google API keys (AIza...) and newer token-style keys (AQ....).
+    const explicitMatch = unquoted.match(/(?:AIza[0-9A-Za-z_-]{20,}|AQ\.[0-9A-Za-z._-]{20,})/);
+    if (explicitMatch) return explicitMatch[0];
+
+    // Fallback for key files that include only the raw token value.
+    return /^[0-9A-Za-z._-]{20,}$/.test(unquoted) ? unquoted : '';
 }
 
 function resolveGeminiApiKey() {
