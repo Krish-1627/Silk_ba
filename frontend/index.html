@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full overflow-hidden">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SilkOptima - AI Business Analyst Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #chatFeed {
+            scrollbar-width: thin;
+            scrollbar-color: #2FB5AA transparent;
+        }
+
+        #xrayPanel,
+        #factsContainer {
+            scrollbar-width: none;
+        }
+
+        #xrayPanel:hover,
+        #xrayPanel:focus-within,
+        #factsContainer:hover,
+        #factsContainer:focus-within {
+            scrollbar-width: thin;
+            scrollbar-color: #2FB5AA transparent;
+        }
+
+        #xrayPanel::-webkit-scrollbar,
+        #factsContainer::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+
+        #xrayPanel:hover::-webkit-scrollbar,
+        #xrayPanel:focus-within::-webkit-scrollbar,
+        #factsContainer:hover::-webkit-scrollbar,
+        #factsContainer:focus-within::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        #xrayPanel::-webkit-scrollbar-track,
+        #factsContainer::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #xrayPanel::-webkit-scrollbar-thumb,
+        #factsContainer::-webkit-scrollbar-thumb {
+            background: #2FB5AA;
+            border-radius: 999px;
+        }
+
+        #xrayPanel::-webkit-scrollbar-thumb:hover,
+        #factsContainer::-webkit-scrollbar-thumb:hover {
+            background: #25A298;
+        }
+
+        #chatFeed::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chatFeed::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #chatFeed::-webkit-scrollbar-thumb {
+            background: #2FB5AA;
+            border-radius: 999px;
+        }
+
+        #chatFeed::-webkit-scrollbar-thumb:hover {
+            background: #25A298;
+        }
+    </style>
+</head>
+
+<body class="bg-[#D9E2E7] text-[#1F2540] font-sans h-full overflow-hidden flex flex-col">
+
+    <header class="bg-[#D9E2E7] border-b border-[#2FB5AA] p-4 shadow-sm">
+        <div class="max-w-7xl mx-auto flex items-center justify-center">
+            <h1 class="text-[15px] sm:text-xl font-bold tracking-wide text-[#1F2540] text-center whitespace-nowrap">
+                Silk<span class="text-[#2FB5AA]">Optima</span> Business X-Ray</h1>
+        </div>
+    </header>
+
+    <div class="lg:hidden bg-[#D9E2E7] border-b border-[#2FB5AA] px-4 pt-3 pb-2">
+        <div class="max-w-7xl mx-auto grid grid-cols-2 gap-2">
+            <button id="tabChatBtn" type="button"
+                class="border rounded-lg py-2 text-sm font-semibold transition-colors bg-[#2FB5AA] text-[#1F2540] border-transparent">
+                Chat
+            </button>
+            <button id="tabAnalysisBtn" type="button"
+                class="border rounded-lg py-2 text-sm font-semibold transition-colors bg-[#E8F7F6] text-[#1F2540] border-[#2FB5AA]">
+                Analysis
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-1 min-h-0 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+
+        <section id="xrayPanel"
+            class="hidden lg:col-span-1 min-h-0 bg-[#E8F7F6] rounded-xl p-5 border border-[#2FB5AA] lg:flex flex-col space-y-6 shadow-sm overflow-y-auto">
+            <div>
+                <h2 class="text-sm font-semibold text-[#1F2540] uppercase tracking-wider mb-3">X ray clarity possibility
+                </h2>
+                <div class="space-y-4" id="scoreDashboard">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span>Processes</span><span
+                                id="score-Processes">0%</span></div>
+                        <div class="w-full bg-[#D9E2E7] h-2 rounded-full overflow-hidden">
+                            <div id="bar-Processes" class="bg-[#2FB5AA] h-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span>Systems & Tools</span><span
+                                id="score-Systems">0%</span></div>
+                        <div class="w-full bg-[#D9E2E7] h-2 rounded-full overflow-hidden">
+                            <div id="bar-Systems" class="bg-[#2FB5AA] h-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span>Data & Information</span><span
+                                id="score-Data_Information">0%</span></div>
+                        <div class="w-full bg-[#D9E2E7] h-2 rounded-full overflow-hidden">
+                            <div id="bar-Data_Information" class="bg-[#2FB5AA] h-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span>People & Context</span><span
+                                id="score-People">0%</span></div>
+                        <div class="w-full bg-[#D9E2E7] h-2 rounded-full overflow-hidden">
+                            <div id="bar-People" class="bg-[#2FB5AA] h-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1"><span>Performance Metrics</span><span
+                                id="score-Performance">0%</span></div>
+                        <div class="w-full bg-[#D9E2E7] h-2 rounded-full overflow-hidden">
+                            <div id="bar-Performance" class="bg-[#2FB5AA] h-full transition-all duration-500"
+                                style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-[#2FB5AA] pt-4 flex-1 flex flex-col">
+                <h2 class="text-sm font-semibold text-[#1F2540] uppercase tracking-wider mb-3">Deduced Facts Stack</h2>
+                <div id="factsContainer" class="flex-1 overflow-y-auto space-y-2 max-h-[220px] lg:max-h-none text-xs">
+                    <p class="text-[#1F2540] italic">No operational factual patterns mapped yet. Start speaking with the
+                        analyst...</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="chatSection"
+            class="lg:col-span-2 min-h-0 bg-[#E8F7F6] rounded-xl border border-[#2FB5AA] flex lg:flex flex-col shadow-sm overflow-hidden">
+            <div id="chatFeed" class="flex-1 min-h-0 p-5 overflow-y-auto overscroll-contain space-y-4">
+                <div class="flex items-start space-x-3 max-w-[85%]">
+                    <div
+                        class="bg-[#2FB5AA] border border-[#2FB5AA] text-[#1F2540] font-bold p-2 rounded-lg text-xs tracking-wider">
+                        Silk</div>
+                    <div
+                        class="bg-[#2FB5AA] border border-[#2FB5AA] p-4 rounded-xl text-sm leading-relaxed shadow-sm text-[#000000]">
+                        Hello! I am a business analyst from Silk. To kick off our Business X-Ray diagnostic, could you
+                        share what major problem or operational challenge your organization is currently facing?
+                    </div>
+                </div>
+            </div>
+
+            <div id="loadingIndicator"
+                class="hidden px-5 py-2 text-xs text-[#1F2540] items-center space-x-2 animate-pulse bg-[#E8F7F6] border-t border-[#2FB5AA]">
+                <div class="h-1.5 w-1.5 bg-[#2FB5AA] rounded-full animate-ping"></div>
+                <span>Analyst checking structural matrices and formatting operational logic...</span>
+            </div>
+
+            <form id="chatForm" class="p-4 bg-[#E8F7F6] border-t border-[#2FB5AA] flex items-center space-x-3">
+                <input type="text" id="userInput" placeholder="Type your response here..." required
+                    class="flex-1 bg-[#D9E2E7] border border-[#2FB5AA] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#2FB5AA] text-[#1F2540] placeholder-[#1F2540]">
+                <button type="submit" id="sendBtn" aria-label="Send" title="Send"
+                    class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] font-semibold text-sm px-5 py-3 rounded-lg shadow-md transition-all flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
+                        aria-hidden="true">
+                        <path
+                            d="M3.4 20.4 21 12 3.4 3.6a.75.75 0 0 0-1.05.86l1.7 6.25a.75.75 0 0 0 .72.55h7.44a.75.75 0 0 1 0 1.5H4.81a.75.75 0 0 0-.72.55l-1.7 6.25a.75.75 0 0 0 1.05.86Z" />
+                    </svg>
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const chatFeed = document.getElementById('chatFeed');
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const factsContainer = document.getElementById('factsContainer');
+        const xrayPanel = document.getElementById('xrayPanel');
+        const chatSection = document.getElementById('chatSection');
+        const tabChatBtn = document.getElementById('tabChatBtn');
+        const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
+        const API_BASE_URL = window.location.port === '5500' ? 'http://localhost:3000' : '';
+        let interviewComplete = false;
+        let activeMobileTab = 'chat';
+
+        // Track standard state logs inside client side memory
+        let localChatHistory = [
+            { role: "assistant", text: "Hello! I am a business analyst from Silk. To kick off our Business X-Ray diagnostic, could you share what major problem or operational challenge your organization is currently facing?" }
+        ];
+
+        function setActiveTabButtonStyles(tab) {
+            if (!tabChatBtn || !tabAnalysisBtn) return;
+
+            const isChat = tab === 'chat';
+
+            tabChatBtn.classList.toggle('bg-[#2FB5AA]', isChat);
+            tabChatBtn.classList.toggle('text-[#1F2540]', isChat);
+            tabChatBtn.classList.toggle('border-transparent', isChat);
+            tabChatBtn.classList.toggle('bg-[#E8F7F6]', !isChat);
+            tabChatBtn.classList.toggle('text-[#1F2540]', !isChat);
+            tabChatBtn.classList.toggle('border-[#2FB5AA]', !isChat);
+
+            tabAnalysisBtn.classList.toggle('bg-[#2FB5AA]', !isChat);
+            tabAnalysisBtn.classList.toggle('text-[#1F2540]', !isChat);
+            tabAnalysisBtn.classList.toggle('border-transparent', !isChat);
+            tabAnalysisBtn.classList.toggle('bg-[#E8F7F6]', isChat);
+            tabAnalysisBtn.classList.toggle('text-[#1F2540]', isChat);
+            tabAnalysisBtn.classList.toggle('border-[#2FB5AA]', isChat);
+        }
+
+        function syncMobileLayout() {
+            if (window.innerWidth >= 1024) {
+                xrayPanel.classList.remove('hidden');
+                xrayPanel.classList.add('flex');
+                chatSection.classList.remove('hidden');
+                chatSection.classList.add('flex');
+                return;
+            }
+
+            const showChat = activeMobileTab === 'chat';
+            xrayPanel.classList.toggle('hidden', showChat);
+            xrayPanel.classList.toggle('flex', !showChat);
+            chatSection.classList.toggle('hidden', !showChat);
+            chatSection.classList.toggle('flex', showChat);
+            setActiveTabButtonStyles(activeMobileTab);
+        }
+
+        if (tabChatBtn && tabAnalysisBtn) {
+            tabChatBtn.addEventListener('click', () => {
+                activeMobileTab = 'chat';
+                syncMobileLayout();
+            });
+
+            tabAnalysisBtn.addEventListener('click', () => {
+                activeMobileTab = 'analysis';
+                syncMobileLayout();
+            });
+        }
+
+        window.addEventListener('resize', syncMobileLayout);
+        syncMobileLayout();
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Render User bubble immediately
+            appendMessage('user', text);
+            localChatHistory.push({ role: "user", text: text });
+            userInput.value = '';
+
+            // Toggle Loading UI
+            loadingIndicator.classList.remove('hidden');
+            loadingIndicator.classList.add('flex');
+            userInput.disabled = true;
+
+            try {
+                // Post history context to Express local proxy engine
+                const response = await fetch(`${API_BASE_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatHistory: localChatHistory })
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
+
+                if (response.ok) {
+                    // Update state matrix elements dynamically
+                    updateDashboard(data);
+
+                    // Render AI Response bubble
+                    appendMessage('assistant', data.natural_analyst_response);
+                    localChatHistory.push({ role: "assistant", text: data.natural_analyst_response });
+
+                    if (data.current_question_count >= 10) {
+                        interviewComplete = true;
+                        showInterviewCompletionMessage();
+                        userInput.disabled = true;
+                        document.getElementById('sendBtn').disabled = true;
+                        chatForm.classList.add('hidden');
+                    }
+                } else {
+                    appendMessage('assistant', data.error || "I hit an unexpected disconnect while updating the business operational arrays. Could you please state your problem again?");
+                }
+            } catch (err) {
+                console.error(err);
+                appendMessage('assistant', "Failed to safely connect to the primary business analytics container server.");
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                loadingIndicator.classList.remove('flex');
+                if (!interviewComplete && localChatHistory.length < 21) userInput.disabled = false;
+            }
+        });
+
+        function appendMessage(role, message) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex items-start space-x-3 max-w-[85%] ${role === 'user' ? 'ml-auto justify-end' : ''}`;
+
+            const badge = role === 'user' ? '' : '<div class="bg-[#2FB5AA] border border-[#2FB5AA] text-[#1F2540] font-bold p-2 rounded-lg text-xs tracking-wider">Silk</div>';
+            const bubbleBg = 'bg-[#2FB5AA] border border-[#2FB5AA] text-[#000000]';
+
+            wrapper.innerHTML = `
+                ${badge}
+                <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm">
+                    ${message}
+                </div>
+            `;
+            chatFeed.appendChild(wrapper);
+            chatFeed.scrollTop = chatFeed.scrollHeight;
+        }
+
+        function appendSystemAlert(text) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = "text-center text-xs font-semibold bg-[#E8F7F6] border border-dashed border-[#2FB5AA] text-[#1F2540] p-3 rounded-lg mx-auto max-w-lg my-2";
+            alertDiv.innerText = text;
+            chatFeed.appendChild(alertDiv);
+            chatFeed.scrollTop = chatFeed.scrollHeight;
+        }
+
+        function showInterviewCompletionMessage() {
+            chatFeed.innerHTML = `
+                <div class="h-full w-full flex items-center justify-center px-6">
+                    <div class="text-center text-sm sm:text-base text-[#1F2540] max-w-xl">
+                        Thankyou for your time , I will analysis it and comeback to you soon
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateDashboard(state) {
+            // Dynamic progression updates for clarity pillars
+            const scores = state && state.xray_pillar_clarity_scores ? state.xray_pillar_clarity_scores : null;
+            if (!scores || typeof scores !== 'object') {
+                return;
+            }
+
+            for (const key in scores) {
+                const elementScore = document.getElementById(`score-${key}`);
+                const elementBar = document.getElementById(`bar-${key}`);
+                const normalizedScore = Math.max(0, Math.min(100, Number(scores[key]) || 0));
+                if (elementScore && elementBar) {
+                    elementScore.innerText = `${normalizedScore}%`;
+                    elementBar.style.width = `${normalizedScore}%`;
+                }
+            }
+
+            // Render facts list chips securely
+            if (state.deduced_operational_facts && state.deduced_operational_facts.length > 0) {
+                factsContainer.innerHTML = '';
+                state.deduced_operational_facts.forEach(fact => {
+                    const factItem = document.createElement('div');
+                    factItem.className = "bg-[#E8F7F6] border border-[#2FB5AA] text-[#1F2540] p-2.5 rounded-md flex items-center space-x-2 font-medium shadow-sm hover:border-[#25A298] transition-all";
+                    factItem.innerHTML = `<span class="text-[#2FB5AA] text-base">✓</span> <span>${fact}</span>`;
+                    factsContainer.appendChild(factItem);
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
