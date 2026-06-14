@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SilkOptima - AI Business Analyst Interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         #chatFeed {
             scrollbar-width: thin;
@@ -70,6 +71,55 @@
 
         #chatFeed::-webkit-scrollbar-thumb:hover {
             background: #25A298;
+        }
+
+        @media print {
+            /* Hide all other elements completely from layout to avoid offsets */
+            body > :not(#reportModal) {
+                display: none !important;
+            }
+            /* Reset html and body overflow constraints to support pagination */
+            html, body {
+                overflow: visible !important;
+                height: auto !important;
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* Make modal print container behave like a standard block element */
+            #reportModal {
+                display: block !important;
+                position: relative !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: transparent !important;
+                opacity: 1 !important;
+                z-index: auto !important;
+                backdrop-filter: none !important;
+            }
+            #reportModal > div {
+                display: block !important;
+                border: none !important;
+                box-shadow: none !important;
+                max-width: none !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                transform: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            #reportModal header {
+                display: none !important;
+            }
+            #reportContent {
+                display: block !important;
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+                padding: 0 !important;
+            }
         }
     </style>
 </head>
@@ -147,9 +197,9 @@
                 </div>
             </div>
 
-            <div class="border-t border-[#2FB5AA] pt-4 flex-1 flex flex-col">
+            <div class="border-t border-[#2FB5AA] pt-4">
                 <h2 class="text-sm font-semibold text-[#1F2540] uppercase tracking-wider mb-3">Deduced Facts Stack</h2>
-                <div id="factsContainer" class="flex-1 overflow-y-auto space-y-2 max-h-[220px] lg:max-h-none text-xs">
+                <div id="factsContainer" class="space-y-2 text-xs">
                     <p class="text-[#1F2540] italic">No operational factual patterns mapped yet. Start speaking with the
                         analyst...</p>
                 </div>
@@ -174,7 +224,7 @@
             <div id="loadingIndicator"
                 class="hidden px-5 py-2 text-xs text-[#1F2540] items-center space-x-2 animate-pulse bg-[#E8F7F6] border-t border-[#2FB5AA]">
                 <div class="h-1.5 w-1.5 bg-[#2FB5AA] rounded-full animate-ping"></div>
-                <span>Analyst checking structural matrices and formatting operational logic...</span>
+                <span>Thinking through operational patterns...</span>
             </div>
 
             <form id="chatForm" class="p-4 bg-[#E8F7F6] border-t border-[#2FB5AA] flex items-center space-x-3">
@@ -189,6 +239,11 @@
                     </svg>
                 </button>
             </form>
+            <div id="reportButtonContainer" class="hidden p-4 bg-[#E8F7F6] border-t border-[#2FB5AA] flex justify-center">
+                <button id="createReportBtn" onclick="generateReport()" class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] font-bold text-sm px-8 py-3.5 rounded-lg shadow-md transition-all">
+                    Download Report
+                </button>
+            </div>
         </section>
     </main>
 
@@ -205,6 +260,8 @@
         const API_BASE_URL = window.location.port === '5500' ? 'http://localhost:3000' : '';
         let interviewComplete = false;
         let activeMobileTab = 'chat';
+        let currentAnalystState = null;
+        let activeTypingTimer = null;
 
         // Track standard state logs inside client side memory
         let localChatHistory = [
@@ -263,19 +320,27 @@
         window.addEventListener('resize', syncMobileLayout);
         syncMobileLayout();
 
+        function scrollToBottom() {
+            // Use setTimeout to allow DOM paint / height shifts to finish before scrolling
+            setTimeout(() => {
+                chatFeed.scrollTop = chatFeed.scrollHeight;
+            }, 30);
+        }
+
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const text = userInput.value.trim();
             if (!text) return;
 
             // Render User bubble immediately
-            appendMessage('user', text);
+            appendMessage('user', text, localChatHistory.length);
             localChatHistory.push({ role: "user", text: text });
             userInput.value = '';
 
             // Toggle Loading UI
             loadingIndicator.classList.remove('hidden');
             loadingIndicator.classList.add('flex');
+            scrollToBottom();
             userInput.disabled = true;
 
             try {
@@ -294,48 +359,237 @@
                 }
 
                 if (response.ok) {
+                    currentAnalystState = data;
                     // Update state matrix elements dynamically
                     updateDashboard(data);
 
                     // Render AI Response bubble
-                    appendMessage('assistant', data.natural_analyst_response);
+                    appendMessage('assistant', data.natural_analyst_response, localChatHistory.length, true);
                     localChatHistory.push({ role: "assistant", text: data.natural_analyst_response });
 
-                    if (data.current_question_count >= 10) {
+                    const userMsgCount = localChatHistory.filter(msg => msg.role === 'user').length;
+                    if (userMsgCount >= 10 || data.current_question_count >= 10) {
                         interviewComplete = true;
-                        showInterviewCompletionMessage();
                         userInput.disabled = true;
-                        document.getElementById('sendBtn').disabled = true;
+                        if (document.getElementById('sendBtn')) {
+                            document.getElementById('sendBtn').disabled = true;
+                        }
                         chatForm.classList.add('hidden');
+                        const reportBtnContainer = document.getElementById('reportButtonContainer');
+                        if (reportBtnContainer) {
+                            reportBtnContainer.classList.remove('hidden');
+                        }
                     }
                 } else {
-                    appendMessage('assistant', data.error || "I hit an unexpected disconnect while updating the business operational arrays. Could you please state your problem again?");
+                    localChatHistory.pop(); // Revert user message from history on error
+                    appendMessage('assistant', data.error || "I hit an unexpected disconnect while updating the business operational arrays. Could you please state your problem again?", null, true);
                 }
             } catch (err) {
                 console.error(err);
-                appendMessage('assistant', "Failed to safely connect to the primary business analytics container server.");
+                localChatHistory.pop(); // Revert user message from history on error
+                appendMessage('assistant', "Failed to safely connect to the primary business analytics container server.", null, true);
             } finally {
                 loadingIndicator.classList.add('hidden');
                 loadingIndicator.classList.remove('flex');
-                if (!interviewComplete && localChatHistory.length < 21) userInput.disabled = false;
+                scrollToBottom();
+                if (!activeTypingTimer) {
+                    if (!interviewComplete && localChatHistory.length < 25) userInput.disabled = false;
+                }
             }
         });
 
-        function appendMessage(role, message) {
+        function appendMessage(role, message, index = null, shouldAnimate = false) {
+            if (activeTypingTimer) {
+                clearInterval(activeTypingTimer);
+                activeTypingTimer = null;
+            }
+
             const wrapper = document.createElement('div');
             wrapper.className = `flex items-start space-x-3 max-w-[85%] ${role === 'user' ? 'ml-auto justify-end' : ''}`;
+            if (index !== null) {
+                wrapper.setAttribute('data-index', index);
+            }
 
             const badge = role === 'user' ? '' : '<div class="bg-[#2FB5AA] border border-[#2FB5AA] text-[#1F2540] font-bold p-2 rounded-lg text-xs tracking-wider">Silk</div>';
             const bubbleBg = 'bg-[#2FB5AA] border border-[#2FB5AA] text-[#000000]';
 
+            if (role === 'user') {
+                wrapper.innerHTML = `
+                    <div class="flex flex-col items-end space-y-1">
+                        <div class="relative group">
+                            <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm pr-10 message-text">
+                                ${message}
+                            </div>
+                            <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-[#1F2540] hover:text-black opacity-0 group-hover:opacity-100 transition-opacity edit-btn" title="Edit message" onclick="startEdit(${index})">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                chatFeed.appendChild(wrapper);
+                scrollToBottom();
+            } else {
+                if (shouldAnimate) {
+                    wrapper.innerHTML = `
+                        ${badge}
+                        <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm">
+                            <span class="typing-text"></span><span class="inline-block w-1.5 h-4 bg-[#1F2540] ml-1 animate-pulse typing-cursor">|</span>
+                        </div>
+                    `;
+                    chatFeed.appendChild(wrapper);
+                    scrollToBottom();
+
+                    const textSpan = wrapper.querySelector('.typing-text');
+                    const cursorSpan = wrapper.querySelector('.typing-cursor');
+                    let currentLength = 0;
+                    const speed = 12;
+
+                    userInput.disabled = true;
+                    if (document.getElementById('sendBtn')) {
+                        document.getElementById('sendBtn').disabled = true;
+                    }
+
+                    activeTypingTimer = setInterval(() => {
+                        if (currentLength <= message.length) {
+                            textSpan.innerText = message.substring(0, currentLength);
+                            currentLength++;
+                            scrollToBottom();
+                        } else {
+                            clearInterval(activeTypingTimer);
+                            activeTypingTimer = null;
+                            if (cursorSpan) cursorSpan.remove();
+                            if (!interviewComplete && localChatHistory.length < 25) {
+                                userInput.disabled = false;
+                                if (document.getElementById('sendBtn')) {
+                                    document.getElementById('sendBtn').disabled = false;
+                                }
+                                userInput.focus();
+                            }
+                        }
+                    }, speed);
+                } else {
+                    wrapper.innerHTML = `
+                        ${badge}
+                        <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm">
+                            ${message}
+                        </div>
+                    `;
+                    chatFeed.appendChild(wrapper);
+                    scrollToBottom();
+                }
+            }
+        }
+
+        window.startEdit = function(index) {
+            const wrapper = chatFeed.querySelector(`[data-index="${index}"]`);
+            if (!wrapper) return;
+
+            if (!localChatHistory[index]) {
+                const textEl = wrapper.querySelector('.message-text');
+                const text = textEl ? textEl.innerText.trim() : '';
+                localChatHistory[index] = { role: "user", text: text };
+            }
+            const currentText = localChatHistory[index].text;
             wrapper.innerHTML = `
-                ${badge}
-                <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm">
-                    ${message}
+                <div class="flex flex-col items-end space-y-2 w-full">
+                    <textarea class="w-full bg-[#D9E2E7] border border-[#2FB5AA] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#2FB5AA] text-[#1F2540] min-w-[250px]" rows="2">${currentText}</textarea>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="cancelEdit(${index})" class="bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs font-semibold px-3 py-1.5 rounded transition-all">Cancel</button>
+                        <button type="button" onclick="saveEdit(${index})" class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] text-xs font-semibold px-3 py-1.5 rounded transition-all">Update</button>
+                    </div>
                 </div>
             `;
-            chatFeed.appendChild(wrapper);
-            chatFeed.scrollTop = chatFeed.scrollHeight;
+            scrollToBottom();
+        }
+
+        window.cancelEdit = function(index) {
+            renderChatHistory();
+        }
+
+        window.saveEdit = async function(index) {
+            const wrapper = chatFeed.querySelector(`[data-index="${index}"]`);
+            if (!wrapper) return;
+
+            const textarea = wrapper.querySelector('textarea');
+            const newText = textarea.value.trim();
+            if (!newText) return;
+
+            // Update local history and slice off all subsequent messages
+            if (!localChatHistory[index]) {
+                localChatHistory[index] = { role: "user", text: newText };
+            } else {
+                localChatHistory[index].text = newText;
+            }
+            localChatHistory = localChatHistory.slice(0, index + 1);
+
+            // Re-render up to edited message
+            renderChatHistory();
+
+            // Fetch new response
+            loadingIndicator.classList.remove('hidden');
+            loadingIndicator.classList.add('flex');
+            scrollToBottom();
+            userInput.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatHistory: localChatHistory })
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch {
+                    data = {};
+                }
+
+                if (response.ok) {
+                    currentAnalystState = data;
+                    updateDashboard(data);
+                    appendMessage('assistant', data.natural_analyst_response, localChatHistory.length, true);
+                    localChatHistory.push({ role: "assistant", text: data.natural_analyst_response });
+
+                    const userMsgCount = localChatHistory.filter(msg => msg.role === 'user').length;
+                    if (userMsgCount >= 10 || data.current_question_count >= 10) {
+                        interviewComplete = true;
+                        userInput.disabled = true;
+                        if (document.getElementById('sendBtn')) {
+                            document.getElementById('sendBtn').disabled = true;
+                        }
+                        chatForm.classList.add('hidden');
+                        const reportBtnContainer = document.getElementById('reportButtonContainer');
+                        if (reportBtnContainer) {
+                            reportBtnContainer.classList.remove('hidden');
+                        }
+                    }
+                } else {
+                    localChatHistory.pop(); // Revert edited user message from history on error
+                    appendMessage('assistant', data.error || "I hit an unexpected disconnect while updating the business operational arrays. Could you please state your problem again?", null, true);
+                }
+            } catch (err) {
+                console.error(err);
+                localChatHistory.pop(); // Revert edited user message from history on error
+                appendMessage('assistant', "Failed to safely connect to the primary business analytics container server.", null, true);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                loadingIndicator.classList.remove('flex');
+                scrollToBottom();
+                if (!activeTypingTimer) {
+                    if (!interviewComplete && localChatHistory.length < 25) userInput.disabled = false;
+                }
+            }
+        }
+
+        function renderChatHistory() {
+            chatFeed.innerHTML = '';
+            localChatHistory.forEach((msg, idx) => {
+                appendMessage(msg.role, msg.text, idx, false);
+            });
+            scrollToBottom();
         }
 
         function appendSystemAlert(text) {
@@ -343,17 +597,11 @@
             alertDiv.className = "text-center text-xs font-semibold bg-[#E8F7F6] border border-dashed border-[#2FB5AA] text-[#1F2540] p-3 rounded-lg mx-auto max-w-lg my-2";
             alertDiv.innerText = text;
             chatFeed.appendChild(alertDiv);
-            chatFeed.scrollTop = chatFeed.scrollHeight;
+            scrollToBottom();
         }
 
         function showInterviewCompletionMessage() {
-            chatFeed.innerHTML = `
-                <div class="h-full w-full flex items-center justify-center px-6">
-                    <div class="text-center text-sm sm:text-base text-[#1F2540] max-w-xl">
-                        Thankyou for your time , I will analysis it and comeback to you soon
-                    </div>
-                </div>
-            `;
+            // Deprecated - we now keep the chat feed history visible and append system alerts instead.
         }
 
         function updateDashboard(state) {
@@ -384,7 +632,253 @@
                 });
             }
         }
-    </script>
-</body>
 
+        window.generateReport = async function() {
+            const btn = document.getElementById('createReportBtn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Downloading Report...";
+            
+            const deducedFacts = [];
+            document.querySelectorAll('#factsContainer div').forEach(div => {
+                const text = div.innerText.replace('✓', '').trim();
+                if (text && text !== "No operational factual patterns mapped yet. Start speaking with the analyst...") {
+                    deducedFacts.push(text);
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-report`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatHistory: localChatHistory,
+                        deducedFacts: deducedFacts,
+                        analystState: currentAnalystState
+                    })
+                });
+
+                if (!response.ok) throw new Error("Failed to generate report");
+
+                const data = await response.json();
+                
+                // Helper formatting functions
+                const formatBullets = (arr) => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0) return '<p class="italic text-gray-500 text-xs">None identified.</p>';
+                    return arr.map(line => {
+                        let cleanLine = line.trim();
+                        const match = cleanLine.match(/[a-zA-Z0-9\(\[\"\']/);
+                        if (match && match.index !== undefined) {
+                            cleanLine = cleanLine.substring(match.index);
+                        }
+                        return `
+                            <div class="flex items-start mb-1 text-xs text-gray-700">
+                                <span class="text-[#2FB5AA] mr-2 font-bold">•</span>
+                                <span class="flex-1">${cleanLine}</span>
+                            </div>
+                        `;
+                    }).join('');
+                };
+
+                // Populate PDF Template
+                const now = new Date();
+                document.getElementById('pdfDate').innerText = now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true }) + ', ' + now.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+                document.getElementById('pdfGeneratedTime').innerText = `Generated on ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+                
+                document.getElementById('pdfProblems').innerHTML = formatBullets(data.identified_organization_problems);
+                document.getElementById('pdfRootCauses').innerHTML = formatBullets(data.root_cause_analysis_insights);
+                
+                const roadmap = data.suggested_strategic_roadmap || {};
+                document.getElementById('pdfRoadmapAI').innerHTML = formatBullets(roadmap.ai_solutions);
+                document.getElementById('pdfRoadmapAutomation').innerHTML = formatBullets(roadmap.process_automation);
+                document.getElementById('pdfRoadmapAnalytics').innerHTML = formatBullets(roadmap.data_analytics);
+                
+                // Render the Silk Service Alignment matching the reference image layout exactly
+                const fit = data.service_fit_scores;
+                document.getElementById('pdfServiceFit').innerHTML = `
+                    <div class="border border-[#2FB5AA] rounded-lg p-4 bg-white text-center shadow-sm">
+                        <div class="text-[11px] font-bold uppercase text-gray-500 mb-2">AI SOLUTIONS FIT</div>
+                        <div class="text-2xl font-bold text-[#2FB5AA]">${fit ? fit.ai_fit : 0}%</div>
+                    </div>
+                    <div class="border border-[#2FB5AA] rounded-lg p-4 bg-white text-center shadow-sm">
+                        <div class="text-[11px] font-bold uppercase text-gray-500 mb-2">AUTOMATION FIT</div>
+                        <div class="text-2xl font-bold text-[#2FB5AA]">${fit ? fit.automation_fit : 0}%</div>
+                    </div>
+                    <div class="border border-[#2FB5AA] rounded-lg p-4 bg-white text-center shadow-sm">
+                        <div class="text-[11px] font-bold uppercase text-gray-500 mb-2">ANALYTICS FIT</div>
+                        <div class="text-2xl font-bold text-[#2FB5AA]">${fit ? fit.analytics_fit : 0}%</div>
+                    </div>
+                `;
+
+                let factsHtml = '';
+                if (deducedFacts.length > 0) {
+                    deducedFacts.forEach(f => {
+                        let cleanFact = f.trim();
+                        const match = cleanFact.match(/[a-zA-Z0-9\(\[\"\']/);
+                        if (match && match.index !== undefined) {
+                            cleanFact = cleanFact.substring(match.index);
+                        }
+                        factsHtml += `
+                            <div class="pdf-fact-item flex items-start mb-1 text-xs text-gray-700" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                                <span class="text-[#2FB5AA] mr-2 font-bold">✓</span>
+                                <span class="flex-1">${cleanFact}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    factsHtml = '<p class="italic text-gray-500 text-xs">No facts deduced.</p>';
+                }
+                document.getElementById('pdfFacts').innerHTML = factsHtml;
+
+                let transcriptHtml = '';
+                localChatHistory.forEach(msg => {
+                    const isUser = msg.role === 'user';
+                    const roleName = isUser ? 'User' : 'Silk Analyst';
+                    const headerClass = isUser ? 'text-blue-600 font-semibold' : 'text-[#2FB5AA] font-bold';
+                    const bgClass = isUser ? 'bg-blue-50/40 border-l-2 border-blue-500' : 'bg-teal-50/40 border-l-2 border-[#2FB5AA]';
+                    transcriptHtml += `
+                        <div class="p-2 rounded ${bgClass} mb-2" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                            <div class="text-[10px] uppercase ${headerClass}">${roleName}</div>
+                            <div class="text-xs text-gray-700 mt-1">${msg.text}</div>
+                        </div>
+                    `;
+                });
+                document.getElementById('pdfTranscript').innerHTML = transcriptHtml;
+
+                // Generate PDF
+                const element = document.getElementById('pdfContent');
+                const opt = {
+                    margin:       0.5,
+                    filename:     'SilkOptima_Diagnostic_Report.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                await html2pdf().set(opt).from(element).save();
+            } catch (error) {
+                console.error(error);
+                alert("Error generating the comprehensive report. Please make sure the server is healthy.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        };
+
+        // Note: Modal functions are deprecated as PDF generation is handled directly via html2pdf.
+    </script>
+
+    <!-- Report Modal Overlay -->
+    <div id="pdfTemplateContainer" class="hidden">
+        <div id="pdfContent" class="bg-white text-[#1F2540] font-sans">
+            <style>
+                #pdfContent {
+                    width: 750px !important;
+                    padding: 30px !important;
+                    box-sizing: border-box !important;
+                }
+                #pdfContent * {
+                    box-sizing: border-box !important;
+                }
+                .pdf-section {
+                    margin-bottom: 1.5rem !important;
+                    width: 100% !important;
+                }
+                .pdf-card {
+                    border: 1px solid #2FB5AA !important;
+                    border-radius: 0.375rem !important;
+                    padding: 0.75rem !important;
+                    margin-bottom: 0.5rem !important;
+                    background-color: #ffffff !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    width: 100% !important;
+                }
+                .pdf-fact-item {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    margin-bottom: 0.25rem !important;
+                    display: flex !important;
+                    align-items: start !important;
+                }
+                .pdf-transcript-item {
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    margin-bottom: 0.25rem !important;
+                    font-size: 10px !important;
+                    line-height: 1.3 !important;
+                }
+            </style>
+            <!-- Header -->
+            <div class="flex justify-between items-center border-b-2 border-[#2FB5AA] pb-3 mb-5">
+                <div class="text-[10px] text-gray-500" id="pdfDate"></div>
+                <div class="text-[10px] font-bold text-gray-500">SilkOptima - AI Business Analyst Interface</div>
+            </div>
+            
+            <h1 class="text-xl font-bold mb-1">SilkOptima Business X-Ray Diagnostic Report</h1>
+            <p class="text-[10px] text-gray-500 mb-5" id="pdfGeneratedTime"></p>
+
+            <!-- I. IDENTIFIED ORGANIZATION PROBLEMS -->
+            <div class="pdf-section" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">I. Identified Organization Problems</h3>
+                <div class="text-xs space-y-1 text-gray-700" id="pdfProblems"></div>
+            </div>
+
+            <!-- II. ROOT CAUSE ANALYSIS & INSIGHTS -->
+            <div class="pdf-section" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">II. Root Cause Analysis & Insights</h3>
+                <div class="text-xs space-y-1 text-gray-700" id="pdfRootCauses"></div>
+            </div>
+
+            <!-- III. SUGGESTED STRATEGIC ROADMAP -->
+            <div class="pdf-section" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">III. Suggested Strategic Roadmap</h3>
+                <div class="space-y-3">
+                    <!-- AI Solutions Card -->
+                    <div class="pdf-card">
+                        <div class="flex items-center space-x-2 text-[11px] font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-150">
+                            <span>🤖</span> <span>AI Solutions</span>
+                        </div>
+                        <div class="text-xs space-y-1 text-gray-700" id="pdfRoadmapAI"></div>
+                    </div>
+                    <!-- Process Automation Card -->
+                    <div class="pdf-card">
+                        <div class="flex items-center space-x-2 text-[11px] font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-150">
+                            <span>⚙️</span> <span>Process Automation</span>
+                        </div>
+                        <div class="text-xs space-y-1 text-gray-700" id="pdfRoadmapAutomation"></div>
+                    </div>
+                    <!-- Data Analytics Card -->
+                    <div class="pdf-card">
+                        <div class="flex items-center space-x-2 text-[11px] font-bold text-gray-800 mb-2 pb-1.5 border-b border-gray-150">
+                            <span>📊</span> <span>Data Analytics</span>
+                        </div>
+                        <div class="text-xs space-y-1 text-gray-700" id="pdfRoadmapAnalytics"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IV. SILK SERVICE ALIGNMENT -->
+            <div class="pdf-section" style="page-break-inside: avoid !important; break-inside: avoid !important;">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">IV. Silk Service Alignment</h3>
+                <div class="grid grid-cols-3 gap-4" id="pdfServiceFit">
+                    <!-- Progress boxes populated dynamically -->
+                </div>
+            </div>
+
+            <!-- V. DEDUCED FACTS STACK -->
+            <div class="pdf-section">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">V. Deduced Facts Stack</h3>
+                <div class="text-xs space-y-1 text-gray-700" id="pdfFacts"></div>
+            </div>
+
+            <!-- VI. FULL CHAT TRANSCRIPT -->
+            <div class="pdf-section">
+                <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">VI. Full Chat Transcript</h3>
+                <div class="text-xs space-y-2" id="pdfTranscript"></div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</body>
 </html>
