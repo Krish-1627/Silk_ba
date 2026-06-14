@@ -463,31 +463,35 @@ app.post('/api/chat', async (req, res) => {
 
         const userMsgCount = chatHistory.filter(msg => msg.role === 'user').length;
         if (userMsgCount >= 10 || Number(analystState.current_question_count) >= 10) {
-            fs.mkdirSync(reportDir, { recursive: true });
-            const reportFile = path.join(reportDir, `chat-report-${Date.now()}.json`);
-            const fullChat = [
-                ...chatHistory,
-                { role: 'assistant', text: analystState.natural_analyst_response }
-            ];
+            try {
+                fs.mkdirSync(reportDir, { recursive: true });
+                const reportFile = path.join(reportDir, `chat-report-${Date.now()}.json`);
+                const fullChat = [
+                    ...chatHistory,
+                    { role: 'assistant', text: analystState.natural_analyst_response }
+                ];
 
-            const reportPayload = {
-                createdAt: new Date().toISOString(),
-                current_question_count: analystState.current_question_count,
-                deduced_operational_facts: analystState.deduced_operational_facts,
-                root_causes: analystState.root_causes,
-                ai_opportunities: analystState.ai_opportunities,
-                automation_opportunities: analystState.automation_opportunities,
-                analytics_opportunities: analystState.analytics_opportunities,
-                risks: analystState.risks,
-                business_impact: analystState.business_impact,
-                contradictions: analystState.contradictions,
-                xray_pillar_clarity_scores: analystState.xray_pillar_clarity_scores,
-                discovered_dimensions: analystState.discovered_dimensions,
-                service_fit_scores: analystState.service_fit_scores,
-                chatHistory: fullChat
-            };
+                const reportPayload = {
+                    createdAt: new Date().toISOString(),
+                    current_question_count: analystState.current_question_count,
+                    deduced_operational_facts: analystState.deduced_operational_facts,
+                    root_causes: analystState.root_causes,
+                    ai_opportunities: analystState.ai_opportunities,
+                    automation_opportunities: analystState.automation_opportunities,
+                    analytics_opportunities: analystState.analytics_opportunities,
+                    risks: analystState.risks,
+                    business_impact: analystState.business_impact,
+                    contradictions: analystState.contradictions,
+                    xray_pillar_clarity_scores: analystState.xray_pillar_clarity_scores,
+                    discovered_dimensions: analystState.discovered_dimensions,
+                    service_fit_scores: analystState.service_fit_scores,
+                    chatHistory: fullChat
+                };
 
-            fs.writeFileSync(reportFile, JSON.stringify(reportPayload, null, 2), 'utf8');
+                fs.writeFileSync(reportFile, JSON.stringify(reportPayload, null, 2), 'utf8');
+            } catch (fsError) {
+                console.warn("Failed to log chat report to local disk (this is expected in serverless environments):", fsError.message);
+            }
         }
 
         res.json(analystState);
