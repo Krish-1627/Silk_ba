@@ -239,10 +239,26 @@
                     </svg>
                 </button>
             </form>
-            <div id="reportButtonContainer" class="hidden p-4 bg-[#E8F7F6] border-t border-[#2FB5AA] flex justify-center">
-                <button id="createReportBtn" onclick="generateReport()" class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] font-bold text-sm px-8 py-3.5 rounded-lg shadow-md transition-all">
-                    Download Report
-                </button>
+            <!-- Completion Screen -->
+            <div id="completionScreen" class="hidden flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6 bg-[#E8F7F6] opacity-0 transition-opacity duration-700">
+                <div class="w-16 h-16 bg-[#2FB5AA]/10 text-[#2FB5AA] rounded-full flex items-center justify-center animate-bounce shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-10 h-10">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                
+                <div class="space-y-3 px-4">
+                    <h2 class="text-xl font-bold text-[#1F2540] uppercase tracking-wider">Diagnostic Complete</h2>
+                    <p class="text-sm text-gray-700 max-w-md leading-relaxed font-medium" id="completionMessage">
+                        Thank you for providing your time. We will get back to u.
+                    </p>
+                </div>
+
+                <div class="pt-4">
+                    <button id="createReportBtn" onclick="generateReport()" class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] font-bold text-sm px-10 py-4 rounded-lg shadow-lg transition-all transform hover:scale-105 active:scale-95 duration-200 uppercase tracking-wide">
+                        Download Report
+                    </button>
+                </div>
             </div>
         </section>
     </main>
@@ -368,16 +384,11 @@
                     localChatHistory.push({ role: "assistant", text: data.natural_analyst_response });
 
                     const userMsgCount = localChatHistory.filter(msg => msg.role === 'user').length;
-                    if (userMsgCount >= 10 || data.current_question_count >= 10) {
+                    if (data.is_completed || userMsgCount >= 10 || data.current_question_count >= 10) {
                         interviewComplete = true;
                         userInput.disabled = true;
                         if (document.getElementById('sendBtn')) {
                             document.getElementById('sendBtn').disabled = true;
-                        }
-                        chatForm.classList.add('hidden');
-                        const reportBtnContainer = document.getElementById('reportButtonContainer');
-                        if (reportBtnContainer) {
-                            reportBtnContainer.classList.remove('hidden');
                         }
                     }
                 } else {
@@ -467,6 +478,9 @@
                                 }
                                 userInput.focus();
                             }
+                            if (interviewComplete) {
+                                triggerCompletionTransition(message);
+                            }
                         }
                     }, speed);
                 } else {
@@ -523,6 +537,7 @@
                 localChatHistory[index].text = newText;
             }
             localChatHistory = localChatHistory.slice(0, index + 1);
+            interviewComplete = false;
 
             // Re-render up to edited message
             renderChatHistory();
@@ -554,16 +569,11 @@
                     localChatHistory.push({ role: "assistant", text: data.natural_analyst_response });
 
                     const userMsgCount = localChatHistory.filter(msg => msg.role === 'user').length;
-                    if (userMsgCount >= 10 || data.current_question_count >= 10) {
+                    if (data.is_completed || userMsgCount >= 10 || data.current_question_count >= 10) {
                         interviewComplete = true;
                         userInput.disabled = true;
                         if (document.getElementById('sendBtn')) {
                             document.getElementById('sendBtn').disabled = true;
-                        }
-                        chatForm.classList.add('hidden');
-                        const reportBtnContainer = document.getElementById('reportButtonContainer');
-                        if (reportBtnContainer) {
-                            reportBtnContainer.classList.remove('hidden');
                         }
                     }
                 } else {
@@ -586,22 +596,72 @@
 
         function renderChatHistory() {
             chatFeed.innerHTML = '';
+            
+            // Clean up transition classes from chatFeed and chatForm
+            chatFeed.classList.remove('transition-opacity', 'duration-500', 'opacity-0', 'hidden');
+            chatForm.classList.remove('transition-opacity', 'duration-500', 'opacity-0', 'hidden');
+            
+            const completionScreen = document.getElementById('completionScreen');
+            if (completionScreen) {
+                completionScreen.classList.add('hidden', 'opacity-0');
+                completionScreen.classList.remove('opacity-100');
+            }
+
             localChatHistory.forEach((msg, idx) => {
                 appendMessage(msg.role, msg.text, idx, false);
             });
             scrollToBottom();
+
+            if (interviewComplete) {
+                const lastMsg = localChatHistory[localChatHistory.length - 1];
+                const lastText = (lastMsg && lastMsg.role === 'assistant') ? lastMsg.text : "Thank you for providing your time, We will get back to You";
+                triggerCompletionTransition(lastText, true);
+            } else {
+                userInput.disabled = false;
+                if (document.getElementById('sendBtn')) {
+                    document.getElementById('sendBtn').disabled = false;
+                }
+            }
         }
 
-        function appendSystemAlert(text) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = "text-center text-xs font-semibold bg-[#E8F7F6] border border-dashed border-[#2FB5AA] text-[#1F2540] p-3 rounded-lg mx-auto max-w-lg my-2";
-            alertDiv.innerText = text;
-            chatFeed.appendChild(alertDiv);
-            scrollToBottom();
-        }
+        function triggerCompletionTransition(finalMessage, immediate = false) {
+            const completionScreen = document.getElementById('completionScreen');
+            const completionMessage = document.getElementById('completionMessage');
 
-        function showInterviewCompletionMessage() {
-            // Deprecated - we now keep the chat feed history visible and append system alerts instead.
+            if (completionMessage && finalMessage) {
+                completionMessage.innerText = finalMessage;
+            }
+
+            if (immediate) {
+                chatFeed.classList.add('hidden');
+                chatForm.classList.add('hidden');
+                if (completionScreen) {
+                    completionScreen.classList.remove('hidden', 'opacity-0');
+                    completionScreen.classList.add('opacity-100');
+                }
+            } else {
+                userInput.disabled = true;
+                if (document.getElementById('sendBtn')) {
+                    document.getElementById('sendBtn').disabled = true;
+                }
+
+                // Add transitions for smooth fade out
+                chatFeed.classList.add('transition-opacity', 'duration-500', 'opacity-0');
+                chatForm.classList.add('transition-opacity', 'duration-500', 'opacity-0');
+
+                setTimeout(() => {
+                    chatFeed.classList.add('hidden');
+                    chatForm.classList.add('hidden');
+
+                    if (completionScreen) {
+                        completionScreen.classList.remove('hidden');
+                        // Force a reflow to make the transition play
+                        completionScreen.offsetHeight;
+                        completionScreen.classList.remove('opacity-0');
+                        completionScreen.classList.add('opacity-100');
+                    }
+                }, 500);
+            }
         }
 
         function updateDashboard(state) {

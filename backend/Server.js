@@ -186,6 +186,10 @@ const businessAnalystSchema = {
             type: Type.BOOLEAN,
             description: "Set to true if the user's latest message contains gibberish, jokes, or completely off-topic words."
         },
+        is_completed: {
+            type: Type.BOOLEAN,
+            description: "Set to true if the interview is fully complete (meaning 10 user questions have been answered, or we met Condition B or C). Otherwise set to false."
+        },
         question_reasoning: {
             type: Type.OBJECT,
             properties: {
@@ -215,6 +219,7 @@ const businessAnalystSchema = {
         "current_question_count",
         "next_logical_target",
         "is_absurd_or_meaningless_input",
+        "is_completed",
         "question_reasoning",
         "natural_analyst_response"
     ]
@@ -247,7 +252,7 @@ Your goal is to perform a consultative Business X-Ray of an organization within 
 * **Phase 2 (Questions 5-9: Deep Probing & Service Fitting)**: Proactively gather details on data visibility, handovers, and root causes, mapping them specifically to Silk's three pillars: AI Solutions, Process Automation, and Data Analytics.
 * **Phase 3 (From Question 7 onwards: 3 Questions Left)**: Be highly focused and efficient. Realize that only 3 questions remain to gather crucial metrics and missing data needed to formulate high-impact solutions.
 * **Question 10 (Mandatory Summing-up Question)**: Do not ask a generic final question. Synthesize/sum up the key challenges discussed so far in 1 sentence, and ask a final, high-value concluding or validating question to get any remaining context.
-* **Post-Question 10 Response (Interview Completed)**: Once the user has answered the 10th question (the chat history contains exactly 10 user messages), do NOT ask a new question. Instead, set 'natural_analyst_response' to a warm, professional, McKinsey-style conclusion thanking the user for their time, acknowledging the completion of the diagnostic, and stating that the digital transformation report is ready.
+* **Post-Question 10 Response (Interview Completed)**: Once the user has answered the 10th question (the chat history contains exactly 10 user messages, or if Condition B or C is met), set 'is_completed' to true. Do NOT ask any new questions. Instead, set 'natural_analyst_response' to sum up the chat/interview challenges and conclude with the exact sentence: "Thank you for providing your time, We will get back to You"
 
 You can stop asking questions and mark the interview complete if:
 * **Condition A**: 10 questions have been reached.
@@ -462,7 +467,36 @@ app.post('/api/chat', async (req, res) => {
         const analystState = JSON.parse(response.text);
 
         const userMsgCount = chatHistory.filter(msg => msg.role === 'user').length;
-        if (userMsgCount >= 10 || Number(analystState.current_question_count) >= 10) {
+        
+        // Force completion if user message count is >= 10, if the model lists current_question_count >= 10, or is_completed is true
+        if (userMsgCount >= 10 || Number(analystState.current_question_count) >= 10 || analystState.is_completed) {
+            analystState.is_completed = true;
+        }
+
+        // Format and finalize completion response
+        if (analystState.is_completed) {
+            const targetSentence = "Thank you for providing your time, We will get back to You";
+            let responseText = analystState.natural_analyst_response || "";
+            
+            // Clean up any variations of the closing sentence
+            responseText = responseText.replace(/Thank you for providing your time\s*,\s*We will get back to u\.?/gi, "");
+            responseText = responseText.replace(/Thank you for providing your time\s*\.\s*We will get back to u\.?/gi, "");
+            responseText = responseText.replace(/Thank you for providing your time\s*,\s*We will get back to You\.?/gi, "");
+            responseText = responseText.replace(/Thank you for providing your time\s*\.\s*We will get back to You\.?/gi, "");
+            responseText = responseText.trim();
+            
+            // Ensure the response concludes with the exact required sentence
+            if (!responseText.endsWith(targetSentence)) {
+                if (responseText.endsWith(".") || responseText.endsWith("?") || responseText.endsWith("!")) {
+                    responseText += " " + targetSentence;
+                } else {
+                    responseText += ". " + targetSentence;
+                }
+            }
+            analystState.natural_analyst_response = responseText;
+        }
+
+        if (analystState.is_completed) {
             try {
                 fs.mkdirSync(reportDir, { recursive: true });
                 const reportFile = path.join(reportDir, `chat-report-${Date.now()}.json`);
