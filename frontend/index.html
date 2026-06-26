@@ -306,7 +306,9 @@
         const chatSection = document.getElementById('chatSection');
         const tabChatBtn = document.getElementById('tabChatBtn');
         const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
-        const API_BASE_URL = 'http://localhost:3000';
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3000'
+            : window.location.origin;
         let interviewComplete = false;
         let activeMobileTab = 'chat';
         let currentAnalystState = null;
