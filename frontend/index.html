@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SilkOptima - AI Business Analyst Interface</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link id="dynamic-favicon" rel="icon" href="/logo2.png">
+    <link rel="stylesheet" href="/tailwind.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         #chatFeed {
@@ -123,6 +123,38 @@
             }
         }
     </style>
+    <script>
+        // Dynamically generate a highly visible favicon with a white background
+        window.addEventListener('load', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw white rounded rectangle
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 64, 64, 12);
+            ctx.fill();
+
+            // Draw the logo inside it
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                // Scale logo to fit nicely with some padding
+                const pad = 6;
+                const size = 64 - pad * 2;
+                ctx.drawImage(img, pad, pad, size, size);
+                
+                // Update the favicon
+                const link = document.getElementById('dynamic-favicon');
+                if (link) {
+                    link.href = canvas.toDataURL('image/png');
+                }
+            };
+            img.src = '/logo2.png';
+        });
+    </script>
 </head>
 
 <body class="bg-[#D9E2E7] text-[#1F2540] font-sans h-full overflow-hidden flex flex-col">
@@ -229,8 +261,8 @@
             </div>
 
             <form id="chatForm" class="p-4 bg-[#E8F7F6] border-t border-[#2FB5AA] flex items-center space-x-3">
-                <input type="text" id="userInput" placeholder="Type your response here..." required
-                    class="flex-1 bg-[#D9E2E7] border border-[#2FB5AA] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#2FB5AA] text-[#1F2540] placeholder-[#1F2540]">
+                <textarea id="userInput" placeholder="Type your response here..." required rows="1"
+                    class="flex-1 bg-[#D9E2E7] border border-[#2FB5AA] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#2FB5AA] text-[#1F2540] placeholder-[#1F2540] resize-none overflow-y-auto max-h-32 min-h-[46px] leading-normal align-middle"></textarea>
                 <button type="submit" id="sendBtn" aria-label="Send" title="Send"
                     class="bg-[#2FB5AA] hover:bg-[#25A298] text-[#1F2540] font-semibold text-sm px-5 py-3 rounded-lg shadow-md transition-all flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"
@@ -274,11 +306,26 @@
         const chatSection = document.getElementById('chatSection');
         const tabChatBtn = document.getElementById('tabChatBtn');
         const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
-        const API_BASE_URL = window.location.port === '5500' ? 'http://localhost:3000' : '';
+        const API_BASE_URL = 'http://localhost:3000';
         let interviewComplete = false;
         let activeMobileTab = 'chat';
         let currentAnalystState = null;
         let activeTypingTimer = null;
+
+        // Auto-grow function for the userInput textarea
+        function adjustTextareaHeight() {
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+        }
+        userInput.addEventListener('input', adjustTextareaHeight);
+
+        // Submit form on Enter, add newline on Shift+Enter
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        });
 
         // Track standard state logs inside client side memory
         let localChatHistory = [
@@ -353,6 +400,7 @@
             appendMessage('user', text, localChatHistory.length);
             localChatHistory.push({ role: "user", text: text });
             userInput.value = '';
+            userInput.style.height = '';
 
             // Toggle Loading UI
             loadingIndicator.classList.remove('hidden');
@@ -365,7 +413,10 @@
                 const response = await fetch(`${API_BASE_URL}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chatHistory: localChatHistory })
+                    body: JSON.stringify({ 
+                        chatHistory: localChatHistory,
+                        analystState: currentAnalystState
+                    })
                 });
 
                 let data = {};
@@ -447,7 +498,7 @@
                     wrapper.innerHTML = `
                         ${badge}
                         <div class="${bubbleBg} p-4 rounded-xl text-sm leading-relaxed shadow-sm">
-                            <span class="typing-text"></span><span class="inline-block w-1.5 h-4 bg-[#1F2540] ml-1 animate-pulse typing-cursor">|</span>
+                            <span class="typing-text"></span>
                         </div>
                     `;
                     chatFeed.appendChild(wrapper);
@@ -479,9 +530,11 @@
                                 }
                                 userInput.focus();
                             }
-                            if (interviewComplete) {
-                                triggerCompletionTransition(message);
-                            }
+                             if (interviewComplete) {
+                                setTimeout(() => {
+                                    triggerCompletionTransition(message);
+                                }, 5000); // Wait 5 seconds for the user to read the final response
+                             }
                         }
                     }, speed);
                 } else {
@@ -553,7 +606,10 @@
                 const response = await fetch(`${API_BASE_URL}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chatHistory: localChatHistory })
+                    body: JSON.stringify({ 
+                        chatHistory: localChatHistory,
+                        analystState: currentAnalystState
+                    })
                 });
 
                 let data = {};
@@ -937,8 +993,6 @@
                 <h3 class="text-xs font-bold uppercase text-[#2FB5AA] mb-2">VI. Full Chat Transcript</h3>
                 <div class="text-xs space-y-2" id="pdfTranscript"></div>
             </div>
-        </div>
-    </div>
         </div>
     </div>
 </body>

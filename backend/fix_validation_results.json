@@ -1,0 +1,174 @@
+{
+  "runAt": "2026-06-26T20:07:57.074Z",
+  "summary": {
+    "total": 22,
+    "passed": 22,
+    "failed": 0
+  },
+  "byIssue": {
+    "Issue 1 — IDK Repetition Loop": [
+      {
+        "suite": "Issue 1",
+        "case": "After 2x IDK on impactQuantification, planner selects a DIFFERENT dimension",
+        "ok": true,
+        "got": "problemUnderstanding",
+        "expected": "!== impactQuantification"
+      },
+      {
+        "suite": "Issue 1",
+        "case": "Selected dimension is still a valid planning dimension (not complete)",
+        "ok": true,
+        "got": "problemUnderstanding",
+        "expected": "a valid non-complete dimension"
+      },
+      {
+        "suite": "Issue 1",
+        "case": "REGRESSION CHECK: Without evadedDimensions, impactQuantification wins again next turn",
+        "ok": true,
+        "got": "impactQuantification",
+        "expected": "impactQuantification (old broken re-selection)"
+      },
+      {
+        "suite": "Issue 1",
+        "case": "WITH evadedDimensions fix: impactQuantification is permanently blocked even next turn",
+        "ok": true,
+        "got": "problemUnderstanding",
+        "expected": "!== impactQuantification"
+      }
+    ],
+    "Issue 2 — Semantic Service Tagging": [
+      {
+        "suite": "Issue 2",
+        "case": "\"hand-types data into legacy software\" correctly scores automation signal > 0",
+        "ok": true,
+        "got": 6.2,
+        "expected": "> 0"
+      },
+      {
+        "suite": "Issue 2",
+        "case": "\"re-keys information one by one\" also boosts automation score",
+        "ok": true,
+        "got": 6.2,
+        "expected": ">= 2.4 (at least 2 semantic hits at 1.2 each)"
+      },
+      {
+        "suite": "Issue 2",
+        "case": "\"flying blind\" and \"gut feel\" correctly score analytics signal > 0",
+        "ok": true,
+        "got": 5,
+        "expected": "> 0"
+      },
+      {
+        "suite": "Issue 2",
+        "case": "\"too many applicants hard to pick\" correctly scores ai_solutions signal > 0",
+        "ok": true,
+        "got": 1.5,
+        "expected": "> 0"
+      }
+    ],
+    "Issue 3 — Numeric Contradiction": [
+      {
+        "suite": "Issue 3",
+        "case": "\"5 claims/day\" vs \"5,000 claims/day\" is flagged as a contradiction",
+        "ok": true,
+        "got": 1,
+        "expected": "> 0"
+      },
+      {
+        "suite": "Issue 3",
+        "case": "3 vs 30 (10x) on same subject flagged as contradiction",
+        "ok": true,
+        "got": 1,
+        "expected": "> 0"
+      },
+      {
+        "suite": "Issue 3",
+        "case": "10 vs 90 (9x ratio) does NOT trigger contradiction (below 10x threshold)",
+        "ok": true,
+        "got": 0,
+        "expected": "0"
+      },
+      {
+        "suite": "Issue 3",
+        "case": "Different subjects (team size vs invoice volume) do NOT produce false contradiction",
+        "ok": true,
+        "got": 0,
+        "expected": "0"
+      }
+    ],
+    "Issue 4 — Smart Turn Caps": [
+      {
+        "suite": "Issue 4",
+        "case": "Turn 4 with 2 locked services: must NOT close (min=6 enforced)",
+        "ok": true,
+        "got": "opportunityDepth",
+        "expected": "!== complete"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "Turn 6 + all 3 services locked + rich evidence: closes early (isReadyToPitch)",
+        "ok": true,
+        "got": "complete",
+        "expected": "complete"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "Turn 6, consecutive IDK, 2 leads locked → fires final_context_close (one last question)",
+        "ok": true,
+        "got": "final_context_close",
+        "expected": "final_context_close"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "After final_context_close asked + no answer → closes interview (targetDimension=complete)",
+        "ok": true,
+        "got": "complete",
+        "expected": "complete"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "Turn 6, consecutive IDK, only 1 lead locked → must NOT close early (continue to turn 10)",
+        "ok": true,
+        "got": "impactQuantification",
+        "expected": "!== complete and !== final_context_close"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "Turn 10 (hard cap): always closes regardless of lead count",
+        "ok": true,
+        "got": "complete",
+        "expected": "complete"
+      },
+      {
+        "suite": "Issue 4",
+        "case": "Turn 5 consecutive IDK with 2 leads: still asks final_context_close (turns >= 5, enforced)",
+        "ok": true,
+        "got": "final_context_close",
+        "expected": "final_context_close"
+      }
+    ],
+    "Issue 5 — Rejected Question Memory": [
+      {
+        "suite": "Issue 5",
+        "case": "After \"skip\" on processDocumentation: planner never re-selects it",
+        "ok": true,
+        "got": "impactQuantification",
+        "expected": "not in [processDocumentation, toolStackClarity]"
+      },
+      {
+        "suite": "Issue 5",
+        "case": "Planner still selects a productive dimension despite evasion list",
+        "ok": true,
+        "got": "impactQuantification",
+        "expected": "one of the remaining valid dimensions"
+      },
+      {
+        "suite": "Issue 5",
+        "case": "Even with highest uncertainty score, evaded dimension is NOT selected (penalty overrides)",
+        "ok": true,
+        "got": "impactQuantification",
+        "expected": "!== processDocumentation"
+      }
+    ]
+  }
+}
